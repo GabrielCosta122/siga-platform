@@ -1,0 +1,8 @@
+import { ChevronRight } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { records } from '@/features/maintenance/data'
+import { cn } from '@/lib/utils'
+type RecordItem = typeof records[number]
+function MaintenanceTimeline({ items, selected, onSelect }: { items: RecordItem[]; selected: string; onSelect: (record: RecordItem) => void }) { const months = [...new Set(items.map((item) => item.month))]; return <div className="space-y-7">{months.map((month) => <section key={month}><h3 className="font-display text-xl font-semibold">{month}</h3><div className="relative mt-4 space-y-3 border-l pl-6">{items.filter((item) => item.month === month).map((item) => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => onSelect(item)} className={cn('relative w-full rounded-lg text-left focus-visible:outline-2 focus-visible:outline-ring', selected === item.id && 'ring-2 ring-primary/30')}><span className="absolute top-5 -left-9 flex size-6 items-center justify-center rounded-full border bg-background text-primary"><Icon className="size-3" /></span><Card className="shadow-book-xs"><CardContent className="flex items-center gap-3 pt-4"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.date} · {item.item}</p></div><div className="text-right"><Badge variant="secondary">{item.status}</Badge><p className="mt-1 text-xs text-muted-foreground">{item.cost}</p></div><ChevronRight className="size-4 text-muted-foreground" /></CardContent></Card></button> })}</div></section>)}</div> }
+export { MaintenanceTimeline }

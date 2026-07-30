@@ -1,0 +1,13 @@
+import { AirVent, Armchair, CookingPot, LampDesk, Refrigerator, Sofa, Table2, Tv } from 'lucide-react'
+const items=[
+{id:'cabinets',type:'Patrimônio',name:'Armários planejados da cozinha',room:'Cozinha',category:'Marcenaria',value:'R$ 8.500,00',date:'10 jun 2026',status:'Em uso',important:true,document:'Nota fiscal da marcenaria.pdf',chapter:'Instalação dos armários da cozinha',icon:CookingPot,guarantee:'—',brand:'',model:''},
+{id:'counter',type:'Patrimônio',name:'Bancada de quartzo',room:'Cozinha',category:'Acabamento',value:'R$ 4.200,00',date:'18 jun 2026',status:'Em uso',important:false,document:'',chapter:'A cozinha começou a ganhar forma',icon:Table2,guarantee:'junho de 2031',brand:'',model:''},
+{id:'floor',type:'Patrimônio',name:'Piso laminado',room:'Quarto principal',category:'Revestimento',value:'R$ 3.600,00',date:'03 jul 2026',status:'Em uso',important:false,document:'Nota fiscal dos revestimentos.pdf',chapter:'',icon:Armchair,guarantee:'—',brand:'',model:''},
+{id:'ac',type:'Patrimônio',name:'Ar-condicionado',room:'Quarto principal',category:'Equipamento instalado',value:'R$ 2.900,00',date:'03 jul 2026',status:'Em uso',important:true,document:'',chapter:'',icon:AirVent,guarantee:'vence em 30 dias',brand:'',model:'AC-2026-0948'},
+{id:'fridge',type:'Inventário',name:'Geladeira',room:'Cozinha',category:'Eletrodoméstico',value:'R$ 3.850,00',date:'15 jul 2026',status:'Em uso',important:false,document:'',chapter:'',icon:Refrigerator,guarantee:'julho de 2027',brand:'Samsung',model:'RT38'},
+{id:'sofa',type:'Inventário',name:'Sofá',room:'Sala',category:'Móvel',value:'R$ 2.700,00',date:'20 jul 2026',status:'Em uso',important:true,document:'',chapter:'O primeiro móvel da nossa sala',icon:Sofa,guarantee:'—',brand:'',model:''},
+{id:'tv',type:'Inventário',name:'Televisão',room:'Sala',category:'Eletrônico',value:'R$ 2.400,00',date:'18 jul 2026',status:'Em uso',important:false,document:'',chapter:'',icon:Tv,guarantee:'—',brand:'LG',model:'TV-55-4820'},
+{id:'table',type:'Inventário',name:'Mesa de jantar',room:'Sala',category:'Móvel',value:'R$ 1.850,00',date:'25 jul 2026',status:'Aguardando entrega',important:false,document:'',chapter:'',icon:Table2,guarantee:'—',brand:'',model:''},
+{id:'chair',type:'Inventário',name:'Cadeira de escritório',room:'Escritório',category:'Móvel',value:'R$ 920,00',date:'12 jul 2026',status:'Em uso',important:false,document:'',chapter:'',icon:LampDesk,guarantee:'—',brand:'',model:''}]
+const rooms=[['Sala',12,'R$ 10.200'],['Cozinha',14,'R$ 18.300'],['Quarto principal',9,'R$ 6.400'],['Escritório',6,'R$ 2.800'],['Banheiro',3,'R$ 1.200'],['Varanda',2,'R$ 900'],['Área de serviço',2,'R$ 650'],['Geral',4,'R$ 2.000']] as const
+export {items,rooms}; export type AssetItem=typeof items[number]
