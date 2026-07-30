@@ -1,1 +1,15 @@
-import{BookOpen,FileText,Home,Sparkles,Wrench}from'lucide-react';import type{NavigationItem}from'@/components/layout/Sidebar';import{MainLayout}from'@/layouts/MainLayout';import{Maintenance}from'@/pages/Maintenance';const navigation:NavigationItem[]=[{icon:Home,label:'Sweet Home',href:'/'},{icon:BookOpen,label:'Livro da Casa',href:'/livro-da-casa'},{icon:FileText,label:'Documentos',href:'/documentos'},{icon:Wrench,label:'Manutenção',href:'/manutencao',current:true},{icon:Sparkles,label:'Ateliê',href:'/atelie'}];function App(){return <MainLayout title="Manutenção" navigation={navigation}><Maintenance/></MainLayout>}export default App
+import { Link, Route, Routes } from 'react-router'
+import { Button } from '@/components/ui/button'
+import { AppLayout } from '@/app/AppLayout'
+import { AssetsInventory } from '@/pages/AssetsInventory'
+import { Atelie } from '@/pages/Atelie'
+import { ChapterDetails } from '@/pages/ChapterDetails'
+import { Documents } from '@/pages/Documents'
+import { Financial } from '@/pages/Financial'
+import { HouseBook } from '@/pages/HouseBook'
+import { Maintenance } from '@/pages/Maintenance'
+import { NewChapter } from '@/pages/NewChapter'
+import { Settings } from '@/pages/Settings'
+import { SweetHome } from '@/pages/SweetHome'
+function NotFound(){return <div className="bg-background px-6 py-20 text-center"><h1 className="font-display text-3xl font-semibold">Esta página ainda não faz parte da história</h1><Button className="mt-5" render={<Link to="/"/>}>Voltar à Sweet Home</Button></div>}
+function App(){return <Routes><Route element={<AppLayout/>}><Route path="/" element={<SweetHome/>}/><Route path="/livro-da-casa" element={<HouseBook/>}/><Route path="/livro-da-casa/:chapterId" element={<ChapterDetails/>}/><Route path="/novo-capitulo" element={<NewChapter/>}/><Route path="/financeiro" element={<Financial/>}/><Route path="/documentos" element={<Documents/>}/><Route path="/patrimonio" element={<AssetsInventory/>}/><Route path="/manutencao" element={<Maintenance/>}/><Route path="/atelie" element={<Atelie/>}/><Route path="/configuracoes" element={<Settings/>}/><Route path="*" element={<NotFound/>}/></Route></Routes>};export default App
