@@ -22,7 +22,7 @@ const defaultNavigation: NavigationItem[] = [
 function Sidebar({ navigation = defaultNavigation }: SidebarProps) {
   return (
     <aside
-      className="group/sidebar relative z-30 flex h-svh w-16 shrink-0 origin-left flex-col overflow-hidden border-r bg-sidebar shadow-book-xs transition-[width,transform,box-shadow] duration-500 ease-out hover:w-64 hover:[transform:perspective(1200px)_rotateY(-1deg)] hover:shadow-book-md focus-within:w-64 focus-within:[transform:perspective(1200px)_rotateY(-1deg)] focus-within:shadow-book-md"
+      className="group/sidebar fixed top-0 bottom-0 left-0 z-30 flex h-screen w-16 origin-left flex-col overflow-hidden border-r bg-sidebar shadow-book-xs transition-[width,transform,box-shadow] duration-500 ease-out hover:w-64 hover:[transform:perspective(1200px)_rotateY(-1deg)] hover:shadow-book-md focus-within:w-64 focus-within:[transform:perspective(1200px)_rotateY(-1deg)] focus-within:shadow-book-md"
       aria-label="Navegação principal"
     >
       <div className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />

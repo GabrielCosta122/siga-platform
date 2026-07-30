@@ -15,7 +15,7 @@ type MainLayoutProps = {
  */
 function MainLayout({ children, navigation, title }: MainLayoutProps) {
   return (
-    <div className="flex min-h-svh bg-background">
+    <div className="min-h-svh bg-background pl-16">
       <Sidebar navigation={navigation} />
       <div className="min-w-0 flex-1">
         <Header title={title} />
