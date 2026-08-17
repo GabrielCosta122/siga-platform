@@ -1,4 +1,4 @@
-import type { Asset, Chapter, EntityId, FinancialCommitment, FinancialTransaction, HouseDocument, MaintenanceRecord, Property, Room } from '@/domain/types'
+import type { Asset, Chapter, DocumentFolder, EntityId, FinancialCommitment, FinancialTransaction, HouseDocument, MaintenanceRecord, Property, Room } from '@/domain/types'
 import type { AppState } from './app-state'
 
 export type AppAction =
@@ -18,6 +18,7 @@ export type AppAction =
   | { type: 'ADD_DOCUMENT'; payload: HouseDocument }
   | { type: 'UPDATE_DOCUMENT'; payload: { id: EntityId; changes: Partial<HouseDocument> } }
   | { type: 'DELETE_DOCUMENT'; payload: EntityId }
+  | { type: 'ADD_DOCUMENT_FOLDER'; payload: DocumentFolder }
   | { type: 'ADD_ASSET'; payload: Asset }
   | { type: 'UPDATE_ASSET'; payload: { id: EntityId; changes: Partial<Asset> } }
   | { type: 'DELETE_ASSET'; payload: EntityId }

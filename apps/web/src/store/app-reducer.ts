@@ -27,6 +27,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case 'ADD_DOCUMENT': return { ...state, documents: [...state.documents, action.payload], updatedAt }
     case 'UPDATE_DOCUMENT': return { ...state, documents: updateById(state.documents, action.payload.id, action.payload.changes, updatedAt), updatedAt }
     case 'DELETE_DOCUMENT': return { ...state, documents: deleteById(state.documents, action.payload), updatedAt }
+    case 'ADD_DOCUMENT_FOLDER': return { ...state, documentFolders: [...state.documentFolders, action.payload], updatedAt }
     case 'ADD_ASSET': return { ...state, assets: [...state.assets, action.payload], updatedAt }
     case 'UPDATE_ASSET': return { ...state, assets: updateById(state.assets, action.payload.id, action.payload.changes, updatedAt), updatedAt }
     case 'DELETE_ASSET': return { ...state, assets: deleteById(state.assets, action.payload), updatedAt }
