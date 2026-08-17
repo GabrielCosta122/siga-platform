@@ -25,7 +25,7 @@ function AttachmentsPanel({ featuredPhoto, onFeaturedPhotoChange }: AttachmentsP
               <h3 className="font-display text-lg font-semibold">Fotos</h3>
               <p className="mt-1 text-sm text-muted-foreground">Guarde os detalhes que merecem voltar à memória.</p>
             </div>
-            <Button variant="outline" size="sm"><ImagePlus aria-hidden="true" /> Adicionar</Button>
+            <Button type="button" variant="outline" size="sm"><ImagePlus aria-hidden="true" /> Adicionar</Button>
           </div>
           <div className="grid grid-cols-3 gap-3">
             {[0, 1, 2].map((photo) => {
@@ -63,7 +63,7 @@ function AttachmentsPanel({ featuredPhoto, onFeaturedPhotoChange }: AttachmentsP
               <h3 className="font-display text-lg font-semibold">Documentos</h3>
               <p className="mt-1 text-sm text-muted-foreground">Arquivos que ajudam a preservar o contexto.</p>
             </div>
-            <Button variant="outline" size="sm"><Upload aria-hidden="true" /> Adicionar</Button>
+            <Button type="button" variant="outline" size="sm"><Upload aria-hidden="true" /> Adicionar</Button>
           </div>
           <ul className="divide-y rounded-md border bg-background px-3">
             {documents.map((document) => (

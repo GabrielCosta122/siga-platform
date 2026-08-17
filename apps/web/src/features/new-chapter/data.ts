@@ -1,50 +1,19 @@
 import type { LucideIcon } from 'lucide-react'
-import {
-  Armchair,
-  Banknote,
-  Building2,
-  CalendarClock,
-  Construction,
-  FileCheck,
-  FileText,
-  Hammer,
-  Heart,
-  KeyRound,
-  Package,
-  Sparkles,
-  Wrench,
-} from 'lucide-react'
+import type { ChapterCategory as DomainChapterCategory, ChapterImpact } from '@/domain/types'
+import { Armchair, Banknote, Building2, CalendarClock, Construction, FileCheck, FileText, Hammer, Heart, KeyRound, Package, Sparkles, Wrench } from 'lucide-react'
 
-type Impact = {
-  description: string
-  icon: LucideIcon
-  id: string
-  label: string
-}
-
-type ChapterCategory = {
-  contextClass: string
-  icon: LucideIcon
-  id: string
-  label: string
-}
+type Impact = { description: string; icon: LucideIcon; id: ChapterImpact; label: string }
+type ChapterCategory = { contextClass: string; icon: LucideIcon; id: DomainChapterCategory; label: string }
 
 const impacts: Impact[] = [
   { id: 'financial', label: 'Financeiro', description: 'Valores, pagamentos ou investimentos.', icon: Banknote },
-  { id: 'assets', label: 'Patrimônio', description: 'Mudanças na estrutura ou no imóvel.', icon: Building2 },
+  { id: 'property', label: 'Patrimônio', description: 'Mudanças na estrutura ou no imóvel.', icon: Building2 },
   { id: 'inventory', label: 'Inventário', description: 'Itens adquiridos, movidos ou retirados.', icon: Package },
-  { id: 'documents', label: 'Documentação', description: 'Contratos, notas fiscais ou arquivos.', icon: FileText },
-  { id: 'timeline', label: 'Cronograma', description: 'Marcos, prazos ou etapas da jornada.', icon: CalendarClock },
+  { id: 'documentation', label: 'Documentação', description: 'Contratos, notas fiscais ou arquivos.', icon: FileText },
+  { id: 'schedule', label: 'Cronograma', description: 'Marcos, prazos ou etapas da jornada.', icon: CalendarClock },
   { id: 'maintenance', label: 'Manutenção', description: 'Cuidados, reparos ou revisões.', icon: Wrench },
 ]
-
-const unrelatedImpact: Impact = {
-  id: 'unrelated',
-  label: 'Não relacionado',
-  description: 'Um momento sem impacto operacional.',
-  icon: Heart,
-}
-
+const unrelatedImpact: Impact = { id: 'unrelated', label: 'Não relacionado', description: 'Um momento sem impacto operacional.', icon: Heart }
 const categories: ChapterCategory[] = [
   { id: 'construction', label: 'Construção', icon: Construction, contextClass: 'bg-primary/5' },
   { id: 'acquisition', label: 'Aquisição', icon: KeyRound, contextClass: 'bg-success/10' },
