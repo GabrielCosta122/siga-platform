@@ -3,8 +3,8 @@ import type { AppState } from './app-state'
 import { createInitialAppState } from './initial-data'
 
 const now = () => new Date().toISOString()
-const updateById = <T extends { id: string; updatedAt: string }>(items: T[], id: string, changes: Partial<T>, updatedAt: string) =>
-  items.map(item => item.id === id ? { ...item, ...changes, id: item.id, updatedAt } : item)
+const updateById = <T extends { id: string; createdAt: string; updatedAt: string }>(items: T[], id: string, changes: Partial<T>, updatedAt: string) =>
+  items.map(item => item.id === id ? { ...item, ...changes, id: item.id, createdAt: item.createdAt, updatedAt } : item)
 const deleteById = <T extends { id: string }>(items: T[], id: string) => items.filter(item => item.id !== id)
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -35,6 +35,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case 'UPDATE_MAINTENANCE': return { ...state, maintenanceRecords: updateById(state.maintenanceRecords, action.payload.id, action.payload.changes, updatedAt), updatedAt }
     case 'DELETE_MAINTENANCE': return { ...state, maintenanceRecords: deleteById(state.maintenanceRecords, action.payload), updatedAt }
     case 'COMPLETE_MAINTENANCE': return { ...state, maintenanceRecords: updateById(state.maintenanceRecords, action.payload.id, { status: 'completed', completedDate: action.payload.completedDate ?? updatedAt.slice(0, 10) }, updatedAt), updatedAt }
+    case 'ADD_MAINTENANCE_ROUTINE': return { ...state, maintenanceRoutines: [...state.maintenanceRoutines, action.payload], updatedAt }
+    case 'UPDATE_MAINTENANCE_ROUTINE': return { ...state, maintenanceRoutines: updateById(state.maintenanceRoutines, action.payload.id, action.payload.changes, updatedAt), updatedAt }
+    case 'DELETE_MAINTENANCE_ROUTINE': return state.maintenanceRoutines.some(item => item.id === action.payload)
+      ? { ...state, maintenanceRoutines: deleteById(state.maintenanceRoutines, action.payload), updatedAt }
+      : state
     case 'ADD_ROOM': return { ...state, rooms: [...state.rooms, action.payload], updatedAt }
     case 'UPDATE_ROOM': return { ...state, rooms: updateById(state.rooms, action.payload.id, action.payload.changes, updatedAt), updatedAt }
     case 'ARCHIVE_ROOM': return { ...state, rooms: updateById(state.rooms, action.payload, { active: false }, updatedAt), updatedAt }

@@ -1,4 +1,4 @@
-import type { Asset, Chapter, DocumentFolder, EntityId, FinancialCommitment, FinancialTransaction, HouseDocument, MaintenanceRecord, Property, Room } from '@/domain/types'
+import type { Asset, Chapter, DocumentFolder, EntityId, FinancialCommitment, FinancialTransaction, HouseDocument, ISODateString, MaintenanceRecord, MaintenanceRoutine, Property, Room } from '@/domain/types'
 import type { AppState } from './app-state'
 
 export type AppAction =
@@ -25,7 +25,10 @@ export type AppAction =
   | { type: 'ADD_MAINTENANCE'; payload: MaintenanceRecord }
   | { type: 'UPDATE_MAINTENANCE'; payload: { id: EntityId; changes: Partial<MaintenanceRecord> } }
   | { type: 'DELETE_MAINTENANCE'; payload: EntityId }
-  | { type: 'COMPLETE_MAINTENANCE'; payload: { id: EntityId; completedDate?: string } }
+  | { type: 'COMPLETE_MAINTENANCE'; payload: { id: EntityId; completedDate?: ISODateString } }
+  | { type: 'ADD_MAINTENANCE_ROUTINE'; payload: MaintenanceRoutine }
+  | { type: 'UPDATE_MAINTENANCE_ROUTINE'; payload: { id: EntityId; changes: Partial<MaintenanceRoutine> } }
+  | { type: 'DELETE_MAINTENANCE_ROUTINE'; payload: EntityId }
   | { type: 'ADD_ROOM'; payload: Room }
   | { type: 'UPDATE_ROOM'; payload: { id: EntityId; changes: Partial<Room> } }
   | { type: 'ARCHIVE_ROOM'; payload: EntityId }

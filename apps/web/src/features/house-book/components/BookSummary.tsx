@@ -2,9 +2,10 @@ import { BookOpen, CalendarDays, FileText, Image, Tag } from 'lucide-react'
 import type { Chapter } from '@/domain/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { categoryLabels, chapterDateShort } from '@/features/chapters/presentation'
+import { compareChaptersChronologicallyAsc, isValidChapterDate } from '@/lib/chapter-date'
 
 function BookSummary({ chapters }: { chapters: Chapter[] }) {
-  const sorted = [...chapters].sort((a, b) => a.date.localeCompare(b.date))
+  const sorted = chapters.filter(chapter => isValidChapterDate(chapter.date)).sort(compareChaptersChronologicallyAsc)
   const frequencies = chapters.reduce<Record<string, number>>((all, chapter) => ({ ...all, [chapter.category]: (all[chapter.category] ?? 0) + 1 }), {})
   const frequent = Object.entries(frequencies).sort((a, b) => b[1] - a[1])[0]?.[0] as Chapter['category'] | undefined
   const items = [

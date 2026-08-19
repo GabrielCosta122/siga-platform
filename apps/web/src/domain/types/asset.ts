@@ -1,5 +1,14 @@
 import type { EntityId, ISODateString, ISODateTimeString, RecordStatus } from './shared'
 
+export type AssetStatus =
+  | 'in_use'
+  | 'stored'
+  | 'maintenance'
+  | 'borrowed'
+  | 'awaiting_delivery'
+  | 'discarded'
+  | RecordStatus
+
 export interface Asset {
   id: EntityId
   name: string
@@ -8,7 +17,7 @@ export interface Asset {
   roomId: EntityId | null
   category: string
   value: number
-  status: RecordStatus
+  status: AssetStatus
   brand: string
   model: string
   serialNumber: string

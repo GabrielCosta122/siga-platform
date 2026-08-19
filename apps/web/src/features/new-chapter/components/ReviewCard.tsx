@@ -2,14 +2,16 @@ import { CalendarDays, CheckCircle2, Image, Paperclip } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatChapterDateLong } from '@/lib/chapter-date'
 
 type ReviewCardProps = {
   category: string
+  date: string
   description: string
   impacts: string[]
 }
 
-function ReviewCard({ category, description, impacts }: ReviewCardProps) {
+function ReviewCard({ category, date, description, impacts }: ReviewCardProps) {
   const title = description.trim() || 'Um novo momento para lembrar'
 
   return (
@@ -39,8 +41,8 @@ function ReviewCard({ category, description, impacts }: ReviewCardProps) {
             <dd className="font-medium">2</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="size-4" aria-hidden="true" /> Data</dt>
-            <dd className="font-medium">15 de julho de 2026</dd>
+            <dt className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="size-4" aria-hidden="true" /> Data do capítulo</dt>
+            <dd className="text-right font-medium">{formatChapterDateLong(date)}</dd>
           </div>
         </dl>
         <div>
