@@ -1,23 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Banknote, BookOpen, CalendarDays, Filter, Landmark, Plus, Search, WalletCards } from 'lucide-react'
+import { Banknote, BookOpen, CalendarDays, FileSpreadsheet, Filter, Landmark, Plus, Search, WalletCards } from 'lucide-react'
 import { Link } from 'react-router'
-import type { FinancialCommitment, FinancialTransaction } from '@/domain/types'
+import type { FinancialCommitment, FinancialLoan, FinancialTransaction } from '@/domain/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { CommitmentManager } from '@/features/financial/components/CommitmentManager'
 import { CommitmentsList } from '@/features/financial/components/CommitmentsList'
 import { FinancialSummaryCard } from '@/features/financial/components/FinancialSummaryCard'
+import { FinancingChargesImport } from '@/features/financial/components/FinancingChargesImport'
 import { InvestmentEvolution } from '@/features/financial/components/InvestmentEvolution'
+import { LoanDetails } from '@/features/financial/components/LoanDetails'
+import { LoanForm } from '@/features/financial/components/LoanForm'
+import { LoanSection } from '@/features/financial/components/LoanSection'
 import { MovementList } from '@/features/financial/components/MovementList'
 import { TransactionDetails } from '@/features/financial/components/TransactionDetails'
 import { TransactionForm } from '@/features/financial/components/TransactionForm'
+import type { EditableInstallmentChanges } from '@/features/financial/components/LoanInstallmentForm'
+import { createLoanInstallmentCommitment, type ManualLoanSchedule } from '@/features/financial/loan-schedule'
 import { financialCategories, formatFinancialDate, getCategoryIcon, getCategoryLabel, normalizeTransactionStatus } from '@/features/financial/presentation'
 import { formatCurrencyBRL } from '@/lib/utils'
 import { getFutureCommitments, getInvestmentDistribution, getInvestmentEvolution, getNextFinancialCommitment, getPaidAmount, getTotalInvested } from '@/store/selectors'
 import { useAppStore } from '@/store/useAppStore'
 
-type Panel = { kind: 'create' } | { kind: 'details' | 'edit'; id: string } | { kind: 'commitments' } | null
+type Panel =
+  | { kind: 'create' }
+  | { kind: 'details' | 'edit'; id: string }
+  | { kind: 'commitments' }
+  | { kind: 'loan-create' }
+  | { kind: 'loan-details'; id: string }
+  | { kind: 'import-charges' }
+  | null
 
 function Financial() {
   const { state, dispatch } = useAppStore()
@@ -31,6 +44,12 @@ function Financial() {
   const [feedback, setFeedback] = useState('')
   const transactionDetailsRef = useRef<HTMLDivElement>(null)
   const shouldFocusTransactionDetails = useRef(false)
+  const commitmentsPanelRef = useRef<HTMLDivElement>(null)
+  const shouldFocusCommitmentsPanel = useRef(false)
+  const [commitmentsFocusRequest, setCommitmentsFocusRequest] = useState(0)
+  const loanPanelRef = useRef<HTMLDivElement>(null)
+  const shouldFocusLoanPanel = useRef(false)
+  const [loanFocusRequest, setLoanFocusRequest] = useState(0)
   const chapters = state.chapters
   const periodOptions = useMemo(() => Array.from(new Set(state.financialTransactions.filter(item => /^\d{4}-\d{2}-\d{2}$/.test(String(item.date))).map(item => item.date.slice(0, 7)))).sort((a, b) => b.localeCompare(a)), [state.financialTransactions])
   const selectedTransaction = panel && 'id' in panel ? state.financialTransactions.find(item => item.id === panel.id) : undefined
@@ -53,10 +72,36 @@ function Financial() {
     transactionDetailsRef.current?.focus({ preventScroll: true })
   }, [panel, selectedTransaction])
 
+  useEffect(() => {
+    if (!shouldFocusCommitmentsPanel.current || panel?.kind !== 'commitments') return
+
+    shouldFocusCommitmentsPanel.current = false
+    commitmentsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    commitmentsPanelRef.current?.focus({ preventScroll: true })
+  }, [commitmentsFocusRequest, panel])
+
+  useEffect(() => {
+    if (!shouldFocusLoanPanel.current || (panel?.kind !== 'loan-create' && panel?.kind !== 'loan-details')) return
+
+    shouldFocusLoanPanel.current = false
+    loanPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    loanPanelRef.current?.focus({ preventScroll: true })
+  }, [loanFocusRequest, panel])
+
   function viewTransactionDetails(transaction: FinancialTransaction) {
     shouldFocusTransactionDetails.current = true
     setPanel({ kind: 'details', id: transaction.id })
     setConfirmingDelete(false)
+  }
+  function openCommitments() {
+    shouldFocusCommitmentsPanel.current = true
+    setPanel({ kind: 'commitments' })
+    setCommitmentsFocusRequest(request => request + 1)
+  }
+  function openLoanPanel(nextPanel: Extract<Panel, { kind: 'loan-create' | 'loan-details' }>) {
+    shouldFocusLoanPanel.current = true
+    setPanel(nextPanel)
+    setLoanFocusRequest(request => request + 1)
   }
   function showFeedback(message: string) { setFeedback(message); window.setTimeout(() => setFeedback(''), 2600) }
   function saveTransaction(transaction: FinancialTransaction) {
@@ -65,18 +110,73 @@ function Financial() {
     setPanel(null)
   }
   function deleteTransaction() { if (!selectedTransaction) return; dispatch({ type: 'DELETE_FINANCIAL_TRANSACTION', payload: selectedTransaction.id }); setPanel(null); setConfirmingDelete(false); showFeedback('Movimentação excluída.') }
-  function saveCommitment(commitment: FinancialCommitment, editing: boolean) { dispatch(editing ? { type: 'UPDATE_FINANCIAL_COMMITMENT', payload: { id: commitment.id, changes: commitment } } : { type: 'ADD_FINANCIAL_COMMITMENT', payload: commitment }); showFeedback(editing ? 'Compromisso atualizado.' : 'Compromisso registrado.') }
-  function deleteCommitment(id: string) { dispatch({ type: 'DELETE_FINANCIAL_COMMITMENT', payload: id }); showFeedback('Compromisso excluído.') }
+  function saveCommitment(commitments: FinancialCommitment[], editing: boolean) {
+    const [commitment] = commitments
+    if (!commitment) return
 
-  return <div className="bg-background px-4 py-8 sm:px-6 lg:px-8"><div className="mx-auto max-w-[1200px] space-y-8"><header className="flex flex-col gap-5 border-b pb-6 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Financeiro</h1><p className="mt-1 text-sm text-muted-foreground sm:text-base">Cada investimento ajuda a construir esta história.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setPanel({ kind: 'commitments' })}><CalendarDays aria-hidden="true" /> Ver compromissos</Button><Button type="button" onClick={() => setPanel({ kind: 'create' })}><Plus aria-hidden="true" /> Registrar movimentação</Button></div></header>
+    if (editing) {
+      dispatch({ type: 'UPDATE_FINANCIAL_COMMITMENT', payload: { id: commitment.id, changes: commitment } })
+      showFeedback(commitment.seriesId ? 'Parcela atualizada.' : 'Compromisso atualizado.')
+      return
+    }
+
+    dispatch({ type: 'ADD_FINANCIAL_COMMITMENTS', payload: commitments })
+    showFeedback(commitments.length > 1 ? `${commitments.length} parcelas registradas.` : 'Compromisso registrado.')
+  }
+  function importFinancingCharges(schedule: ManualLoanSchedule) {
+    dispatch({ type: 'ADD_FINANCIAL_LOAN_SCHEDULE', payload: schedule })
+    showFeedback(`Financiamento importado com ${schedule.installments.length} parcelas.`)
+    openLoanPanel({ kind: 'loan-details', id: schedule.loan.id })
+  }
+  function deleteCommitments(ids: string[]) {
+    if (!ids.length) return
+    const deletesInstallment = ids.length === 1 && state.financialCommitments.some(item => item.id === ids[0] && item.seriesId)
+    dispatch({ type: 'DELETE_FINANCIAL_COMMITMENTS', payload: ids })
+    showFeedback(ids.length > 1 ? 'Esta parcela e as próximas foram excluídas.' : deletesInstallment ? 'Parcela excluída.' : 'Compromisso excluído.')
+  }
+  function createLoan(schedule: ManualLoanSchedule) {
+    dispatch({ type: 'ADD_FINANCIAL_LOAN_SCHEDULE', payload: schedule })
+    showFeedback('Financiamento e cronograma registrados.')
+    openLoanPanel({ kind: 'loan-details', id: schedule.loan.id })
+  }
+  function updateLoan(loanId: string, changes: Partial<FinancialLoan>) {
+    dispatch({ type: 'UPDATE_FINANCIAL_LOAN', payload: { id: loanId, changes } })
+    showFeedback('Financiamento atualizado.')
+  }
+  function updateLoanInstallment(installmentId: string, changes: EditableInstallmentChanges) {
+    const installment = state.loanInstallments.find(item => item.id === installmentId)
+    const loan = installment ? state.financialLoans.find(item => item.id === installment.loanId) : undefined
+    const hasCommitment = state.financialCommitments.some(item => item.loanInstallmentId === installmentId)
+    const updatedInstallment = installment ? { ...installment, ...changes } : undefined
+    const commitment = loan && updatedInstallment && !hasCommitment
+      ? createLoanInstallmentCommitment({ loan, installment: updatedInstallment }) ?? undefined
+      : undefined
+    dispatch({ type: 'UPDATE_LOAN_INSTALLMENT', payload: { id: installmentId, changes, commitment } })
+    showFeedback('Parcela atualizada.')
+  }
+  function registerLoanPayment(installmentId: string, transaction: FinancialTransaction, documentIds: string[]) {
+    dispatch({ type: 'REGISTER_LOAN_INSTALLMENT_PAYMENT', payload: { installmentId, transaction, documentIds } })
+    showFeedback('Pagamento registrado e adicionado às movimentações.')
+  }
+  function deleteLoan(loanId: string) {
+    dispatch({ type: 'DELETE_FINANCIAL_LOAN', payload: loanId })
+    setPanel(null)
+    showFeedback('Financiamento excluído. Movimentações históricas foram preservadas.')
+  }
+
+  return <div className="bg-background px-4 py-8 sm:px-6 lg:px-8"><div className="mx-auto max-w-[1200px] space-y-8"><header className="flex flex-col gap-5 border-b pb-6 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Financeiro</h1><p className="mt-1 text-sm text-muted-foreground sm:text-base">Cada investimento ajuda a construir esta história.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setPanel({ kind: 'import-charges' })}><FileSpreadsheet aria-hidden="true" /> Importar planilha</Button><Button type="button" variant="outline" onClick={openCommitments}><CalendarDays aria-hidden="true" /> Ver compromissos</Button><Button type="button" onClick={() => setPanel({ kind: 'create' })}><Plus aria-hidden="true" /> Registrar movimentação</Button></div></header>
     {feedback ? <p role="status" className="rounded-md bg-success/10 px-4 py-3 text-sm text-success">{feedback}</p> : null}
     {panel?.kind === 'create' ? <TransactionForm chapters={chapters} onCancel={() => setPanel(null)} onSave={saveTransaction} /> : null}
     {panel?.kind === 'edit' && selectedTransaction ? <TransactionForm key={selectedTransaction.id} chapters={chapters} initial={selectedTransaction} onCancel={() => setPanel({ kind: 'details', id: selectedTransaction.id })} onSave={saveTransaction} /> : null}
     {panel?.kind === 'details' && selectedTransaction ? <div ref={transactionDetailsRef} role="region" aria-label={`Detalhes da movimentação: ${selectedTransaction.title || 'Movimentação sem título'}`} tabIndex={-1} className="scroll-mt-20 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"><TransactionDetails transaction={selectedTransaction} state={state} confirmingDelete={confirmingDelete} onClose={() => { setPanel(null); setConfirmingDelete(false) }} onEdit={() => { setPanel({ kind: 'edit', id: selectedTransaction.id }); setConfirmingDelete(false) }} onAskDelete={() => setConfirmingDelete(true)} onCancelDelete={() => setConfirmingDelete(false)} onDelete={deleteTransaction} /></div> : null}
-    {panel?.kind === 'commitments' ? <CommitmentManager commitments={state.financialCommitments} chapters={chapters} onClose={() => setPanel(null)} onSave={saveCommitment} onDelete={deleteCommitment} /> : null}
+    {panel?.kind === 'commitments' ? <div ref={commitmentsPanelRef} role="region" aria-label="Compromissos financeiros" tabIndex={-1} className="scroll-mt-24 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"><CommitmentManager commitments={state.financialCommitments} chapters={chapters} onClose={() => setPanel(null)} onSave={saveCommitment} onDelete={deleteCommitments} onOpenLoan={loanId => openLoanPanel({ kind: 'loan-details', id: loanId })} /></div> : null}
+    {panel?.kind === 'import-charges' ? <FinancingChargesImport propertyId={state.property.id} existingLoanIds={state.financialLoans.map(loan => loan.id)} onClose={() => setPanel(null)} onImport={importFinancingCharges} /> : null}
+    {panel?.kind === 'loan-create' ? <div ref={loanPanelRef} role="region" aria-label="Adicionar financiamento" tabIndex={-1} className="scroll-mt-24 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"><LoanForm propertyId={state.property.id} onCancel={() => setPanel(null)} onCreate={createLoan} /></div> : null}
+    {panel?.kind === 'loan-details' ? <div ref={loanPanelRef} role="region" aria-label="Detalhes do financiamento" tabIndex={-1} className="scroll-mt-24 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"><LoanDetails key={panel.id} state={state} loanId={panel.id} onClose={() => setPanel(null)} onUpdateLoan={updateLoan} onUpdateInstallment={updateLoanInstallment} onRegisterPayment={registerLoanPayment} onDelete={deleteLoan} /></div> : null}
     <div className="flex items-center gap-2 text-sm text-muted-foreground"><Filter className="size-4" aria-hidden="true" /><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Filtrar por período" className="rounded-md bg-transparent outline-none"><option value="Todos">Todos os períodos</option>{periodOptions.map(month => <option key={month} value={month}>{new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(`${month}-01T12:00:00`))}</option>)}</select></div>
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><FinancialSummaryCard icon={Landmark} value={formatCurrencyBRL(totalInvested)} label="Total investido" detail="na história do lar"/><FinancialSummaryCard icon={WalletCards} value={formatCurrencyBRL(paidAmount)} label="Pago até agora" detail="etapas já concluídas"/><FinancialSummaryCard icon={CalendarDays} value={formatCurrencyBRL(futureCommitments)} label="Compromissos futuros" detail="próximas etapas"/><FinancialSummaryCard icon={Banknote} value={nextCommitment ? formatCurrencyBRL(Number.isFinite(nextCommitment.amount) ? nextCommitment.amount : 0) : '—'} label="Próximo pagamento" detail={nextCommitment ? `${nextCommitment.title} · ${formatFinancialDate(nextCommitment.dueDate)}` : 'Nenhum compromisso próximo'}/></section>
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]"><InvestmentEvolution evolution={evolution}/><CommitmentsList commitments={state.financialCommitments} onOpen={() => setPanel({ kind: 'commitments' })}/></section>
+    <section className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]"><InvestmentEvolution evolution={evolution}/><CommitmentsList commitments={state.financialCommitments} onOpen={openCommitments}/></section>
+    <LoanSection state={state} onAdd={() => openLoanPanel({ kind: 'loan-create' })} onView={loan => openLoanPanel({ kind: 'loan-details', id: loan.id })} />
     <section className="rounded-lg bg-secondary/70 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6"><div><h2 className="font-display text-lg font-semibold">Finanças também contam histórias</h2><p className="mt-1 text-sm text-muted-foreground">Vincule uma movimentação a um capítulo para lembrar o que aquele investimento representou.</p></div><Button variant="ghost" className="mt-3 sm:mt-0" render={<Link to="/livro-da-casa" />}><BookOpen aria-hidden="true" /> Ver capítulos relacionados</Button></section>
     <section className="space-y-4"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-display text-xl font-semibold">Movimentações recentes</h2><p className="mt-1 text-sm text-muted-foreground">Registros que acompanham a construção da casa.</p></div><span className="text-xs text-muted-foreground">{filtered.length} movimentações</span></div><div className="flex flex-wrap gap-2"><div className="relative min-w-52 flex-1"><Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true"/><Input value={search} onChange={event => setSearch(event.target.value)} className="pl-9" placeholder="Buscar movimentação"/></div><select value={category} onChange={event => setCategory(event.target.value)} className="h-8 rounded-lg border bg-card px-3 text-sm"><option>Todas</option>{financialCategories.map(item => <option key={item}>{item}</option>)}</select><select value={status} onChange={event => setStatus(event.target.value)} className="h-8 rounded-lg border bg-card px-3 text-sm"><option value="Todos">Todos</option><option value="paid">Pago</option><option value="pending">Pendente</option><option value="scheduled">Agendado</option><option value="cancelled">Cancelado</option></select><select value={type} onChange={event => setType(event.target.value)} className="h-8 rounded-lg border bg-card px-3 text-sm"><option value="Todos">Todos os tipos</option><option value="expense">Despesa</option><option value="income">Entrada</option></select></div>
       {filtered.length ? <MovementList movements={filtered} chapters={state.chapters} onSelect={viewTransactionDetails}/>:<Card><CardContent className="py-12 text-center"><h3 className="font-display text-xl font-semibold">{state.financialTransactions.length ? 'Ainda não há movimentações neste período' : 'Nenhuma movimentação registrada'}</h3><p className="mt-2 text-sm text-muted-foreground">{state.financialTransactions.length ? 'Ajuste os filtros para encontrar outros registros.' : 'Registre um investimento, pagamento ou compromisso para começar a acompanhar a história financeira da casa.'}</p><Button type="button" className="mt-5" onClick={() => setPanel({ kind: 'create' })}><Plus aria-hidden="true"/> Registrar movimentação</Button></CardContent></Card>}

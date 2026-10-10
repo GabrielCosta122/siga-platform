@@ -6,13 +6,18 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { createEntityId } from '@/lib/utils'
 import { financialCategories, isValidISODate, normalizeTransactionStatus, parseCurrencyBRL } from '@/features/financial/presentation'
+import { getConfiguredCategoryOptions } from '@/features/settings/categories'
+import { useAppStore } from '@/store/useAppStore'
 
 type TransactionFormProps = { chapters: Chapter[]; initial?: FinancialTransaction; onCancel: () => void; onSave: (transaction: FinancialTransaction) => void }
 type Errors = Partial<Record<'title' | 'amount' | 'date' | 'category' | 'status', string>>
 const fieldClass = 'h-9 w-full rounded-lg border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 function TransactionForm({ chapters, initial, onCancel, onSave }: TransactionFormProps) {
-  const initialCategory = financialCategories.includes(initial?.category as typeof financialCategories[number]) ? initial!.category : initial ? 'Outros' : 'Aquisição'
+  const { state } = useAppStore()
+  const storedInitialCategory = financialCategories.includes(initial?.category as typeof financialCategories[number]) ? initial!.category : initial ? 'Outros' : undefined
+  const categoryOptions = getConfiguredCategoryOptions(state.settings, 'financial', financialCategories, id => id, storedInitialCategory)
+  const initialCategory = storedInitialCategory ?? categoryOptions[0]?.id ?? 'Aquisição'
   const [title, setTitle] = useState(initial?.title ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [amount, setAmount] = useState(initial ? initial.amount.toFixed(2).replace('.', ',') : '')
@@ -44,7 +49,7 @@ function TransactionForm({ chapters, initial, onCancel, onSave }: TransactionFor
     <label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">Descrição</span><Textarea value={description} onChange={event => setDescription(event.target.value)} className="min-h-20" /></label>
     <label className="space-y-1.5"><span className="text-sm font-medium">Valor</span><Input inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} placeholder="R$ 0,00" aria-invalid={!!errors.amount} />{errors.amount ? <span className="block text-xs text-destructive">{errors.amount}</span> : null}</label>
     <label className="space-y-1.5"><span className="text-sm font-medium">Data</span><Input type="date" value={date} onChange={event => setDate(event.target.value)} aria-invalid={!!errors.date} />{errors.date ? <span className="block text-xs text-destructive">{errors.date}</span> : null}</label>
-    <label className="space-y-1.5"><span className="text-sm font-medium">Categoria</span><select className={fieldClass} value={category} onChange={event => setCategory(event.target.value)}>{financialCategories.map(item => <option key={item}>{item}</option>)}</select>{errors.category ? <span className="block text-xs text-destructive">{errors.category}</span> : null}</label>
+    <label className="space-y-1.5"><span className="text-sm font-medium">Categoria</span><select className={fieldClass} value={category} onChange={event => setCategory(event.target.value)}>{categoryOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>{errors.category ? <span className="block text-xs text-destructive">{errors.category}</span> : null}</label>
     <label className="space-y-1.5"><span className="text-sm font-medium">Status</span><select className={fieldClass} value={status} onChange={event => setStatus(event.target.value as FinancialTransaction['status'])}><option value="paid">Pago</option><option value="pending">Pendente</option><option value="scheduled">Agendado</option><option value="cancelled">Cancelado</option></select>{errors.status ? <span className="block text-xs text-destructive">{errors.status}</span> : null}</label>
     <label className="space-y-1.5"><span className="text-sm font-medium">Tipo</span><select className={fieldClass} value={type} onChange={event => setType(event.target.value as FinancialTransaction['type'])}><option value="expense">Despesa</option><option value="income">Entrada</option></select></label>
     <label className="space-y-1.5"><span className="text-sm font-medium">Capítulo relacionado</span><select className={fieldClass} value={chapterId} onChange={event => setChapterId(event.target.value)}><option value="">Nenhum capítulo</option>{missingChapter ? <option value={initial.chapterId!}>Capítulo relacionado não disponível</option> : null}{chapters.map(chapter => <option key={chapter.id} value={chapter.id}>{chapter.title} · {chapter.date}</option>)}</select></label>

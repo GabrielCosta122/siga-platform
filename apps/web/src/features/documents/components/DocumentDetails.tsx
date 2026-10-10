@@ -12,6 +12,7 @@ type Props = { item: HouseDocument; state: AppState; fileAvailable?: boolean; mo
 function DocumentDetails({ item, state, fileAvailable, moving, confirmingDelete, onOpen, onDownload, onEdit, onToggleImportant, onStartMove, onCancelMove, onMove, onAskDelete, onCancelDelete, onDelete }: Props) {
   const folder = state.documentFolders.find(candidate => candidate.id === item.folderId)
   const chapter = state.chapters.find(candidate => candidate.id === item.chapterId)
+    ?? state.chapters.find(candidate => Array.isArray(candidate.documentIds) && candidate.documentIds.includes(item.id))
   const transaction = state.financialTransactions.find(candidate => candidate.id === item.financialTransactionId)
   return <Card className="shadow-book-sm"><CardHeader><CardTitle className="font-display text-lg">Detalhes do documento</CardTitle></CardHeader><CardContent className="space-y-4">
     <span className="flex size-11 items-center justify-center rounded-md bg-secondary text-primary"><DocumentIcon fileType={item.fileType} category={item.category} className="size-5" /></span>

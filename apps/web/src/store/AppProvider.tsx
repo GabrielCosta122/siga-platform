@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useMemo, useReducer, type ReactNode } from 'react'
-import { appReducer } from './app-reducer'
-import { clearAppState, loadAppState, saveAppState } from './persistence'
-import { createInitialAppState } from './initial-data'
-import { AppStoreContext } from './useAppStore'
+import type { ReactNode } from 'react'
+import { useAuth } from '@/auth/useAuth'
+import { isSupabaseConfigured } from '@/lib/supabase'
+import { MainLayout } from '@/layouts/MainLayout'
+import { SessionWorkspace } from './SessionWorkspace'
+import { StateProvider } from './StateProvider'
+import { AccountAccess } from '@/features/workspace/components/AccountAccess'
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, undefined, loadAppState)
-  useEffect(() => { saveAppState(state) }, [state])
-  const resetAppData = useCallback(() => {
-    clearAppState()
-    dispatch({ type: 'RESET_STATE', payload: createInitialAppState() })
-  }, [])
-  const value = useMemo(() => ({ state, dispatch, resetAppData }), [state, resetAppData])
-  return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>
+  const auth = useAuth()
+  if (!isSupabaseConfigured) return <StateProvider>{children}</StateProvider>
+  if (auth.loading) return <MainLayout title="SIGA"><p role="status" className="p-8">Recuperando sua sessão…</p></MainLayout>
+  if (!auth.user) return <MainLayout title="Sua história"><AccountAccess /></MainLayout>
+  return <SessionWorkspace key={`${auth.user.id}:${auth.getSessionRevision()}`} userId={auth.user.id}>{children}</SessionWorkspace>
 }

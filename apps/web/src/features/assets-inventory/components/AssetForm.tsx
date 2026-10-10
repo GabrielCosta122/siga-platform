@@ -22,6 +22,8 @@ import {
   type AssetKind,
   type CanonicalAssetStatus,
 } from '@/features/assets-inventory/presentation'
+import { getConfiguredCategoryOptions } from '@/features/settings/categories'
+import { useAppStore } from '@/store/useAppStore'
 
 type AssetFormProps = {
   initial?: Asset
@@ -37,11 +39,14 @@ type Errors = Partial<Record<'name' | 'kind' | 'roomId' | 'category' | 'status' 
 const fieldClass = 'h-9 w-full rounded-lg border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 function AssetForm({ initial, rooms, chapters, documents, transactions, onCancel, onSave }: AssetFormProps) {
+  const { state } = useAppStore()
+  const initialCategory = normalizeAssetCategory(initial?.category)
+  const categoryOptions = getConfiguredCategoryOptions(state.settings, 'asset', assetCategories, id => assetCategoryConfig[id].label, initialCategory)
   const [name, setName] = useState(initial?.name ?? '')
   const [kind, setKind] = useState<AssetKind>(normalizeAssetKind(initial?.kind) ?? 'property')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [roomId, setRoomId] = useState(initial?.roomId ?? '')
-  const [category, setCategory] = useState<AssetCategory>(normalizeAssetCategory(initial?.category) ?? 'Outros')
+  const [category, setCategory] = useState<AssetCategory>(initialCategory ?? categoryOptions[0]?.id ?? 'Outros')
   const [status, setStatus] = useState<CanonicalAssetStatus>(normalizeAssetStatus(initial?.status) ?? 'in_use')
   const [important, setImportant] = useState(initial?.important ?? false)
   const [value, setValue] = useState(initial ? getSafeAssetValue(initial.value).toFixed(2).replace('.', ',') : '')
@@ -119,7 +124,7 @@ function AssetForm({ initial, rooms, chapters, documents, transactions, onCancel
           <label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">Nome</span><Input value={name} onChange={event => setName(event.target.value)} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'asset-name-error' : undefined} placeholder="Nome do item" />{errors.name ? <span id="asset-name-error" className="block text-xs text-destructive">{errors.name}</span> : null}</label>
           <label className="space-y-1.5"><span className="text-sm font-medium">Tipo</span><select className={fieldClass} value={kind} onChange={event => setKind(event.target.value as AssetKind)} aria-invalid={!!errors.kind} aria-describedby={errors.kind ? 'asset-kind-error' : undefined}>{assetKinds.map(id => <option key={id} value={id}>{assetKindConfig[id].label}</option>)}</select>{errors.kind ? <span id="asset-kind-error" className="block text-xs text-destructive">{errors.kind}</span> : null}</label>
           <label className="space-y-1.5"><span className="text-sm font-medium">Ambiente</span><select className={fieldClass} value={roomId} onChange={event => setRoomId(event.target.value)} aria-invalid={!!errors.roomId} aria-describedby={errors.roomId ? 'asset-room-error' : undefined}><option value="">Escolha um ambiente</option>{missingRoom ? <option value={initial!.roomId!}>{initialRoom ? `${initialRoom.name} (arquivado)` : 'Ambiente não disponível'}</option> : null}{activeRooms.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}</select>{errors.roomId ? <span id="asset-room-error" className="block text-xs text-destructive">{errors.roomId}</span> : null}</label>
-          <label className="space-y-1.5"><span className="text-sm font-medium">Categoria</span><select className={fieldClass} value={category} onChange={event => setCategory(event.target.value as AssetCategory)} aria-invalid={!!errors.category} aria-describedby={errors.category ? 'asset-category-error' : undefined}>{assetCategories.map(id => <option key={id} value={id}>{assetCategoryConfig[id].label}</option>)}</select>{errors.category ? <span id="asset-category-error" className="block text-xs text-destructive">{errors.category}</span> : null}</label>
+          <label className="space-y-1.5"><span className="text-sm font-medium">Categoria</span><select className={fieldClass} value={category} onChange={event => setCategory(event.target.value as AssetCategory)} aria-invalid={!!errors.category} aria-describedby={errors.category ? 'asset-category-error' : undefined}>{categoryOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>{errors.category ? <span id="asset-category-error" className="block text-xs text-destructive">{errors.category}</span> : null}</label>
           <label className="space-y-1.5"><span className="text-sm font-medium">Status</span><select className={fieldClass} value={status} onChange={event => setStatus(event.target.value as CanonicalAssetStatus)} aria-invalid={!!errors.status} aria-describedby={errors.status ? 'asset-status-error' : undefined}>{assetStatuses.map(id => <option key={id} value={id}>{assetStatusConfig[id].label}</option>)}</select>{errors.status ? <span id="asset-status-error" className="block text-xs text-destructive">{errors.status}</span> : null}</label>
           <label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">Descrição</span><Textarea value={description} onChange={event => setDescription(event.target.value)} className="min-h-20" /></label>
           <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={important} onChange={event => setImportant(event.target.checked)} className="size-4 accent-primary" /> Marcar como importante</label>

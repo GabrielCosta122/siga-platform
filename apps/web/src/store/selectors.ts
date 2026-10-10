@@ -1,6 +1,16 @@
 import type { AppState } from './app-state'
 import { compareChaptersChronologicallyAsc, compareChaptersChronologicallyDesc, isValidChapterDate } from '@/lib/chapter-date'
-import type { MaintenanceFrequency, MaintenancePriority, MaintenanceRecord, MaintenanceStatus, MaintenanceType } from '@/domain/types'
+import type { AppCategoryScope, AppCategorySetting, FinancialCommitment, LoanInstallment, LoanInstallmentStatus, MaintenanceFrequency, MaintenancePriority, MaintenanceRecord, MaintenanceStatus, MaintenanceType } from '@/domain/types'
+
+const getSafeCategorySettings = (state: AppState) => Array.isArray(state.settings?.categories)
+  ? state.settings.categories
+  : []
+export const getCategorySettingsByScope = (state: AppState, scope: AppCategoryScope, includeInactive = true): AppCategorySetting[] =>
+  getSafeCategorySettings(state)
+    .filter(category => category.scope === scope && (includeInactive || category.active))
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'pt-BR'))
+export const getCategorySetting = (state: AppState, scope: AppCategoryScope, id: string) =>
+  getSafeCategorySettings(state).find(category => category.scope === scope && category.id === id)
 
 export const getPublishedChapters = (state: AppState) => state.chapters.filter(chapter => chapter.status === 'published')
 export const getDraftChapters = (state: AppState) => state.chapters.filter(chapter => chapter.status === 'draft')
@@ -19,7 +29,15 @@ export const getAdjacentPublishedChapters = (state: AppState, chapterId: string)
     ? { previous: undefined, next: undefined }
     : { previous: chapters[index - 1], next: chapters[index + 1] }
 }
-export const getDocumentsByChapterId = (state: AppState, chapterId: string) => state.documents.filter(document => document.chapterId === chapterId)
+export const getDocumentsByChapterId = (state: AppState, chapterId: string) => {
+  const chapter = getChapterById(state, chapterId)
+  const linkedDocumentIds = new Set(
+    Array.isArray(chapter?.documentIds)
+      ? chapter.documentIds.filter((id): id is string => typeof id === 'string')
+      : [],
+  )
+  return state.documents.filter(document => document.chapterId === chapterId || linkedDocumentIds.has(document.id))
+}
 export const getDocumentById = (state: AppState, id: string) => state.documents.find(document => document.id === id)
 export const getImportantDocuments = (state: AppState) => state.documents.filter(document => document.important)
 export const getDocumentsByFolderId = (state: AppState, folderId: string) => state.documents.filter(document => document.folderId === folderId)
@@ -49,15 +67,206 @@ const validISODate = (value: unknown): value is string => {
   const timestamp = Date.parse(`${value}T00:00:00.000Z`)
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value
 }
+const getLocalISODate = () => {
+  const date = new Date()
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
 const isPaidExpense = (status: unknown, type: unknown) => (status === 'paid' || status === 'Pago') && (type === 'expense' || type === 'Despesa')
 const isOpenCommitment = (status: unknown) => ['pending', 'scheduled', 'future', 'Próximo', 'Agendado', 'Futuro'].includes(String(status))
+const getInstallmentOrder = (commitment: FinancialCommitment) => Number.isInteger(commitment.installmentNumber) && Number(commitment.installmentNumber) > 0
+  ? Number(commitment.installmentNumber)
+  : Number.MAX_SAFE_INTEGER
+export const compareFinancialCommitmentsByDueDate = (a: FinancialCommitment, b: FinancialCommitment) => {
+  const aHasValidDate = validISODate(a.dueDate)
+  const bHasValidDate = validISODate(b.dueDate)
+  if (aHasValidDate !== bHasValidDate) return aHasValidDate ? -1 : 1
+
+  const dateComparison = aHasValidDate && bHasValidDate ? a.dueDate.localeCompare(b.dueDate) : 0
+  if (dateComparison !== 0) return dateComparison
+
+  const installmentComparison = getInstallmentOrder(a) - getInstallmentOrder(b)
+  if (installmentComparison !== 0) return installmentComparison
+
+  const createdAtComparison = String(a.createdAt).localeCompare(String(b.createdAt))
+  return createdAtComparison || a.id.localeCompare(b.id)
+}
+export const getFinancialCommitmentsByDueDate = (state: AppState) => [...state.financialCommitments].sort(compareFinancialCommitmentsByDueDate)
+export const getFinancialCommitmentsBySeriesId = (state: AppState, seriesId: string | null | undefined) => {
+  if (typeof seriesId !== 'string' || !seriesId.trim()) return []
+  return getFinancialCommitmentsByDueDate(state).filter(commitment => commitment.seriesId === seriesId)
+}
 export const getPaidAmount = (state: AppState) => state.financialTransactions.filter(item => isPaidExpense(item.status, item.type)).reduce((total, item) => total + validAmount(item.amount), 0)
 export const getTotalInvested = getPaidAmount
 export const getFutureCommitments = (state: AppState) => state.financialCommitments.filter(item => isOpenCommitment(item.status)).reduce((total, item) => total + validAmount(item.amount), 0)
-export const getNextFinancialCommitment = (state: AppState, fromDate = new Date().toISOString().slice(0, 10)) =>
+export const getNextFinancialCommitment = (state: AppState, fromDate = getLocalISODate()) =>
   [...state.financialCommitments]
     .filter(item => isOpenCommitment(item.status) && validISODate(item.dueDate) && item.dueDate >= fromDate)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
+    .sort(compareFinancialCommitmentsByDueDate)[0]
+
+const getSafeFinancialLoans = (state: AppState) => Array.isArray(state.financialLoans) ? state.financialLoans : []
+const getSafeLoanInstallments = (state: AppState) => Array.isArray(state.loanInstallments) ? state.loanInstallments : []
+const validLoanAmount = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
+const normalizeLoanStatus = (value: unknown) => typeof value === 'string'
+  ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+  : ''
+const isPaidLoanStatus = (value: unknown) => ['paid', 'pago', 'paga'].includes(normalizeLoanStatus(value))
+const isCancelledLoanStatus = (value: unknown) => ['cancelled', 'canceled', 'cancelado', 'cancelada'].includes(normalizeLoanStatus(value))
+const getLoanInstallmentOrder = (installment: LoanInstallment) => Number.isInteger(installment.installmentNumber) && installment.installmentNumber > 0
+  ? installment.installmentNumber
+  : Number.MAX_SAFE_INTEGER
+const compareLoanInstallments = (a: LoanInstallment, b: LoanInstallment) => {
+  const aHasValidDate = validISODate(a.dueDate)
+  const bHasValidDate = validISODate(b.dueDate)
+  if (aHasValidDate !== bHasValidDate) return aHasValidDate ? -1 : 1
+  const dateComparison = aHasValidDate && bHasValidDate ? a.dueDate.localeCompare(b.dueDate) : 0
+  return dateComparison || getLoanInstallmentOrder(a) - getLoanInstallmentOrder(b) || String(a.id).localeCompare(String(b.id))
+}
+const getLoanInstallmentTransaction = (state: AppState, installment: LoanInstallment) =>
+  typeof installment.financialTransactionId === 'string'
+    ? state.financialTransactions.find(transaction => transaction.id === installment.financialTransactionId)
+    : undefined
+export const getLoanInstallmentPaidAmount = (state: AppState, installment: LoanInstallment) => {
+  if (validLoanAmount(installment.paidAmount) && installment.paidAmount > 0) return installment.paidAmount
+  const transaction = getLoanInstallmentTransaction(state, installment)
+  return transaction && isPaidExpense(transaction.status, transaction.type) ? validAmount(transaction.amount) : 0
+}
+const hasLoanInstallmentPayment = (state: AppState, installment: LoanInstallment) => isPaidLoanStatus(installment.status)
+  || (validLoanAmount(installment.paidAmount) && installment.paidAmount > 0)
+  || getLoanInstallmentPaidAmount(state, installment) > 0
+
+export const getLoanById = (state: AppState, loanId: string) =>
+  getSafeFinancialLoans(state).find(loan => loan.id === loanId)
+
+export const getLoansByPropertyId = (state: AppState, propertyId: string) =>
+  getSafeFinancialLoans(state).filter(loan => loan.propertyId === propertyId)
+
+export const getLoanInstallments = (state: AppState, loanId: string) =>
+  getSafeLoanInstallments(state).filter(installment => installment.loanId === loanId).sort(compareLoanInstallments)
+
+export const getLoanInstallmentById = (state: AppState, installmentId: string) =>
+  getSafeLoanInstallments(state).find(installment => installment.id === installmentId)
+
+export const getLoanInstallmentStatus = (
+  state: AppState,
+  installment: LoanInstallment,
+  referenceDate = getLocalISODate(),
+): LoanInstallmentStatus => {
+  if (hasLoanInstallmentPayment(state, installment)) return 'paid'
+  if (isCancelledLoanStatus(installment.status)) return 'cancelled'
+  if (validISODate(referenceDate) && validISODate(installment.dueDate) && installment.dueDate < referenceDate) return 'overdue'
+  return normalizeLoanStatus(installment.status) === 'upcoming' ? 'upcoming' : 'pending'
+}
+
+export const getPaidLoanInstallments = (state: AppState, loanId: string) =>
+  getLoanInstallments(state, loanId).filter(installment => hasLoanInstallmentPayment(state, installment))
+
+export const getPendingLoanInstallments = (state: AppState, loanId: string) =>
+  getLoanInstallments(state, loanId).filter(installment => !hasLoanInstallmentPayment(state, installment) && !isCancelledLoanStatus(installment.status))
+
+export const getOverdueLoanInstallments = (state: AppState, loanId: string, referenceDate = getLocalISODate()) => {
+  if (!validISODate(referenceDate)) return []
+  return getPendingLoanInstallments(state, loanId).filter(installment =>
+    validISODate(installment.dueDate) && installment.dueDate < referenceDate)
+}
+
+export const getNextLoanInstallment = (state: AppState, loanId: string) =>
+  getPendingLoanInstallments(state, loanId).find(installment => validISODate(installment.dueDate))
+
+export const getLoanTotalPaid = (state: AppState, loanId: string) => {
+  const usedTransactionIds = new Set<string>()
+  return getLoanInstallments(state, loanId).reduce((total, installment) => {
+    if (installment.financialTransactionId) {
+      if (usedTransactionIds.has(installment.financialTransactionId)) return total
+      usedTransactionIds.add(installment.financialTransactionId)
+    }
+    return total + getLoanInstallmentPaidAmount(state, installment)
+  }, 0)
+}
+
+const getLoanInstallmentExpectedAmount = (state: AppState, installment: LoanInstallment) => {
+  if (validLoanAmount(installment.expectedAmount)) return installment.expectedAmount
+  const commitment = state.financialCommitments.find(item => item.loanInstallmentId === installment.id)
+  return commitment && validLoanAmount(commitment.amount) ? commitment.amount : 0
+}
+
+export const getLoanTotalRemaining = (state: AppState, loanId: string) =>
+  getPendingLoanInstallments(state, loanId)
+    .reduce((total, installment) => total + getLoanInstallmentExpectedAmount(state, installment), 0)
+
+export const getLoanCurrentBalance = (state: AppState, loanId: string) => {
+  const latestPaidWithBalance = getPaidLoanInstallments(state, loanId)
+    .filter(installment => validLoanAmount(installment.balanceAfter))
+    .sort((a, b) => {
+      const aDate = validISODate(a.paidDate) ? a.paidDate : validISODate(a.dueDate) ? a.dueDate : ''
+      const bDate = validISODate(b.paidDate) ? b.paidDate : validISODate(b.dueDate) ? b.dueDate : ''
+      return aDate.localeCompare(bDate) || getLoanInstallmentOrder(a) - getLoanInstallmentOrder(b)
+    })
+    .at(-1)
+  if (latestPaidWithBalance && validLoanAmount(latestPaidWithBalance.balanceAfter)) return latestPaidWithBalance.balanceAfter
+
+  const loan = getLoanById(state, loanId)
+  if (loan && validLoanAmount(loan.currentBalance)) return loan.currentBalance
+  return getLoanTotalRemaining(state, loanId)
+}
+
+export type LoanProgress = {
+  totalInstallments: number
+  paidInstallments: number
+  remainingInstallments: number
+  percentage: number
+}
+
+export const getLoanProgress = (state: AppState, loanId: string): LoanProgress => {
+  const loan = getLoanById(state, loanId)
+  const installments = getLoanInstallments(state, loanId)
+  const paidInstallments = installments.filter(installment => hasLoanInstallmentPayment(state, installment)).length
+  const remainingInstallments = installments.filter(installment =>
+    !hasLoanInstallmentPayment(state, installment) && !isCancelledLoanStatus(installment.status)).length
+  const configuredCount = loan && Number.isInteger(loan.installmentCount) && loan.installmentCount > 0
+    ? loan.installmentCount
+    : 0
+  const totalInstallments = Math.max(configuredCount, installments.length)
+  return {
+    totalInstallments,
+    paidInstallments,
+    remainingInstallments,
+    percentage: totalInstallments > 0 ? Math.min(100, (paidInstallments / totalInstallments) * 100) : 0,
+  }
+}
+
+export type LoanEvolutionPoint = {
+  installmentId: string
+  installmentNumber: number
+  dueDate: string
+  expectedAmount: number
+  paidAmount: number
+  cumulativeExpected: number
+  cumulativePaid: number
+  balanceAfter: number | null
+  status: LoanInstallmentStatus
+}
+
+export const getLoanEvolution = (state: AppState, loanId: string): LoanEvolutionPoint[] => {
+  let cumulativeExpected = 0
+  let cumulativePaid = 0
+  return getLoanInstallments(state, loanId).filter(installment => validISODate(installment.dueDate)).map(installment => {
+    const expectedAmount = getLoanInstallmentExpectedAmount(state, installment)
+    const paidAmount = getLoanInstallmentPaidAmount(state, installment)
+    cumulativeExpected += expectedAmount
+    cumulativePaid += paidAmount
+    return {
+      installmentId: installment.id,
+      installmentNumber: installment.installmentNumber,
+      dueDate: installment.dueDate,
+      expectedAmount,
+      paidAmount,
+      cumulativeExpected,
+      cumulativePaid,
+      balanceAfter: validLoanAmount(installment.balanceAfter) ? installment.balanceAfter : null,
+      status: getLoanInstallmentStatus(state, installment),
+    }
+  })
+}
 
 export type InvestmentEvolutionPoint = { month: string; monthKey: string; monthlyAmount: number; accumulatedAmount: number }
 export const getInvestmentEvolution = (state: AppState): InvestmentEvolutionPoint[] => {
@@ -96,11 +305,6 @@ const isCurrentAsset = (status: unknown) => !discardedAssetStatuses.has(
     : '',
 )
 const validAssetValue = (value: number) => Number.isFinite(value) && value >= 0 ? value : 0
-const getLocalISODate = () => {
-  const date = new Date()
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
 const normalizeMaintenanceToken = (value: unknown) => typeof value === 'string'
   ? value
     .normalize('NFD')

@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ChapterCategory as DomainChapterCategory, ChapterImpact } from '@/domain/types'
-import { Armchair, Banknote, Building2, CalendarClock, Construction, FileCheck, FileText, Hammer, Heart, KeyRound, Package, Sparkles, Wrench } from 'lucide-react'
+import { Banknote, Building2, CalendarClock, FileText, Heart, Package, Wrench } from 'lucide-react'
+import { chapterCategories, chapterCategoryConfig } from '@/features/chapters/presentation'
 
 type Impact = { description: string; icon: LucideIcon; id: ChapterImpact; label: string }
 type ChapterCategory = { contextClass: string; icon: LucideIcon; id: DomainChapterCategory; label: string }
@@ -14,14 +15,10 @@ const impacts: Impact[] = [
   { id: 'maintenance', label: 'Manutenção', description: 'Cuidados, reparos ou revisões.', icon: Wrench },
 ]
 const unrelatedImpact: Impact = { id: 'unrelated', label: 'Não relacionado', description: 'Um momento sem impacto operacional.', icon: Heart }
-const categories: ChapterCategory[] = [
-  { id: 'construction', label: 'Construção', icon: Construction, contextClass: 'bg-primary/5' },
-  { id: 'acquisition', label: 'Aquisição', icon: KeyRound, contextClass: 'bg-success/10' },
-  { id: 'renovation', label: 'Reforma', icon: Hammer, contextClass: 'bg-warning/10' },
-  { id: 'furniture', label: 'Mobília', icon: Armchair, contextClass: 'bg-accent' },
-  { id: 'documentation', label: 'Documentação', icon: FileCheck, contextClass: 'bg-secondary' },
-  { id: 'moment', label: 'Momento', icon: Sparkles, contextClass: 'bg-primary/5' },
-]
+const categories: ChapterCategory[] = chapterCategories.map(id => {
+  const config = chapterCategoryConfig[id]
+  return { id, label: config.label, icon: config.editorIcon, contextClass: config.contextClass }
+})
 
 export { categories, impacts, unrelatedImpact }
 export type { ChapterCategory, Impact }

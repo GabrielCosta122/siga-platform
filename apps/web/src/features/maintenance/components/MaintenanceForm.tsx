@@ -29,7 +29,9 @@ import {
   parseMaintenanceCostBRL,
   type MaintenanceType,
 } from '@/features/maintenance/presentation'
+import { getConfiguredCategoryOptions } from '@/features/settings/categories'
 import { createEntityId } from '@/lib/utils'
+import { useAppStore } from '@/store/useAppStore'
 
 type MaintenanceFormMode = 'create' | 'edit' | 'reschedule'
 type MaintenanceStatus = MaintenanceRecord['status']
@@ -68,6 +70,7 @@ function MaintenanceForm({
   onCancel,
   onSave,
 }: MaintenanceFormProps) {
+  const { state } = useAppStore()
   const resolvedMode: MaintenanceFormMode = initial ? mode ?? 'edit' : 'create'
   const isRescheduling = resolvedMode === 'reschedule' && !!initial
   const initialAssetId = typeof initial?.assetId === 'string' ? initial.assetId : ''
@@ -80,10 +83,12 @@ function MaintenanceForm({
     : ''
   const initialCost = getSafeMaintenanceCost(initial?.cost)
   const initialStatus: MaintenanceStatus = normalizeMaintenanceStatus(initial?.status) ?? 'planned'
+  const initialType = normalizeMaintenanceType(initial?.type)
+  const typeOptions = getConfiguredCategoryOptions(state.settings, 'maintenance', maintenanceTypes, id => maintenanceTypeConfig[id].label, initialType)
 
   const [title, setTitle] = useState(getSafeMaintenanceText(initial?.title, ''))
   const [description, setDescription] = useState(getSafeMaintenanceText(initial?.description, ''))
-  const [type, setType] = useState<MaintenanceType>(normalizeMaintenanceType(initial?.type) ?? 'preventive')
+  const [type, setType] = useState<MaintenanceType>(initialType ?? typeOptions[0]?.id ?? 'preventive')
   const [status, setStatus] = useState<MaintenanceStatus>(initialStatus)
   const [priority, setPriority] = useState<MaintenancePriority>(normalizeMaintenancePriority(initial?.priority) ?? 'medium')
   const [scheduledDate, setScheduledDate] = useState(initial
@@ -201,7 +206,7 @@ function MaintenanceForm({
             <legend className="mb-3 font-display text-base font-semibold">Cuidado</legend>
             <label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">Título</span><Input required value={title} onChange={event => setTitle(event.target.value)} aria-invalid={!!errors.title} aria-describedby={errors.title ? 'maintenance-title-error' : undefined} placeholder="Ex.: Revisão do ar-condicionado" />{errors.title ? <span id="maintenance-title-error" className="block text-xs text-destructive">{errors.title}</span> : null}</label>
             <label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">Descrição</span><Textarea value={description} onChange={event => setDescription(event.target.value)} className="min-h-20" placeholder="Conte o que precisa ser cuidado." /></label>
-            <label className="space-y-1.5"><span className="text-sm font-medium">Tipo</span><select required className={fieldClass} value={type} onChange={event => setType(event.target.value as MaintenanceType)} aria-invalid={!!errors.type} aria-describedby={errors.type ? 'maintenance-type-error' : undefined}>{maintenanceTypes.map(id => <option key={id} value={id}>{maintenanceTypeConfig[id].label}</option>)}</select>{errors.type ? <span id="maintenance-type-error" className="block text-xs text-destructive">{errors.type}</span> : null}</label>
+            <label className="space-y-1.5"><span className="text-sm font-medium">Tipo</span><select required className={fieldClass} value={type} onChange={event => setType(event.target.value as MaintenanceType)} aria-invalid={!!errors.type} aria-describedby={errors.type ? 'maintenance-type-error' : undefined}>{typeOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>{errors.type ? <span id="maintenance-type-error" className="block text-xs text-destructive">{errors.type}</span> : null}</label>
             <label className="space-y-1.5"><span className="text-sm font-medium">Status</span><select required className={fieldClass} value={status} onChange={event => updateStatus(event.target.value as MaintenanceStatus)} aria-invalid={!!errors.status} aria-describedby={errors.status ? 'maintenance-status-error' : undefined}>{maintenanceStatuses.map(id => <option key={id} value={id}>{maintenanceStatusConfig[id].label}</option>)}</select>{errors.status ? <span id="maintenance-status-error" className="block text-xs text-destructive">{errors.status}</span> : null}</label>
             <label className="space-y-1.5"><span className="text-sm font-medium">Prioridade</span><select required className={fieldClass} value={priority} onChange={event => setPriority(event.target.value as MaintenancePriority)} aria-invalid={!!errors.priority} aria-describedby={errors.priority ? 'maintenance-priority-error' : undefined}>{maintenancePriorities.map(id => <option key={id} value={id}>{maintenancePriorityConfig[id].label}</option>)}</select>{errors.priority ? <span id="maintenance-priority-error" className="block text-xs text-destructive">{errors.priority}</span> : null}</label>
           </fieldset>

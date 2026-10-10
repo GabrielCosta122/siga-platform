@@ -9,9 +9,12 @@ type ReviewCardProps = {
   date: string
   description: string
   impacts: string[]
+  photoCount: number
+  documentCount: number
+  coverPhotoName?: string
 }
 
-function ReviewCard({ category, date, description, impacts }: ReviewCardProps) {
+function ReviewCard({ category, date, description, impacts, photoCount, documentCount, coverPhotoName }: ReviewCardProps) {
   const title = description.trim() || 'Um novo momento para lembrar'
 
   return (
@@ -34,11 +37,11 @@ function ReviewCard({ category, date, description, impacts }: ReviewCardProps) {
           </div>
           <div className="flex items-center justify-between gap-3">
             <dt className="flex items-center gap-2 text-muted-foreground"><Image className="size-4" aria-hidden="true" /> Fotos</dt>
-            <dd className="font-medium">3</dd>
+            <dd className="text-right font-medium">{photoCount}{coverPhotoName ? <span className="block max-w-32 truncate text-[0.65rem] font-normal text-muted-foreground" title={coverPhotoName}>Capa: {coverPhotoName}</span> : null}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
             <dt className="flex items-center gap-2 text-muted-foreground"><Paperclip className="size-4" aria-hidden="true" /> Documentos</dt>
-            <dd className="font-medium">2</dd>
+            <dd className="font-medium">{documentCount}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
             <dt className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="size-4" aria-hidden="true" /> Data do capítulo</dt>

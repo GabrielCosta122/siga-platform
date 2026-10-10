@@ -27,7 +27,7 @@ function downloadStoredFile(file: StoredDocumentFile) {
 }
 
 function Documents() {
-  const { state, dispatch } = useAppStore()
+  const { state, dispatch, fileDatabaseName, assertScopeCurrent } = useAppStore()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
   const [type, setType] = useState('all')
@@ -47,9 +47,9 @@ function Documents() {
   useEffect(() => {
     let active = true
     if (!selectedId) return () => { active = false }
-    hasDocumentFile(selectedId).then(available => { if (active) setFileStatus({ documentId: selectedId, available }) }).catch(() => { if (active) setFileStatus({ documentId: selectedId, available: false }) })
+    hasDocumentFile(selectedId, fileDatabaseName).then(available => { if (active) setFileStatus({ documentId: selectedId, available }) }).catch(() => { if (active) setFileStatus({ documentId: selectedId, available: false }) })
     return () => { active = false }
-  }, [selectedId])
+  }, [selectedId, fileDatabaseName])
   const categoryCount = new Set(state.documents.map(document => normalizeDocumentCategory(document.category) ?? `unknown:${String(document.category)}`)).size
   const periodOptions = useMemo(() => Array.from(new Set(state.documents.filter(document => /^\d{4}-\d{2}-\d{2}$/.test(String(document.date))).map(document => document.date.slice(0, 7)))).sort((a, b) => b.localeCompare(a)), [state.documents])
   const filtered = useMemo(() => [...state.documents].sort((a, b) => String(b.date).localeCompare(String(a.date))).filter(document => {
@@ -59,14 +59,14 @@ function Documents() {
       && (type === 'all' || normalizeDocumentFileType(document.fileType) === type)
       && (period === 'all' || String(document.date).startsWith(period))
       && (!important || document.important)
-      && (!linked || !!document.chapterId)
+      && (!linked || !!document.chapterId || state.chapters.some(chapter => Array.isArray(chapter.documentIds) && chapter.documentIds.includes(document.id)))
       && (!folderFilter || document.folderId === folderFilter)
-  }), [state.documents, search, category, type, period, important, linked, folderFilter])
+  }), [state.documents, state.chapters, search, category, type, period, important, linked, folderFilter])
   function clear() { setSearch(''); setCategory('all'); setType('all'); setPeriod('all'); setImportant(false); setLinked(false); setFolderFilter(null) }
   function showFeedback(message: string) { setFeedback(message); window.setTimeout(() => setFeedback(''), 2800) }
   async function saveDocument(document: HouseDocument, file?: File) {
     if (file) {
-      try { await saveDocumentFile(document.id, file) }
+      try { await saveDocumentFile(document.id, file, fileDatabaseName) }
       catch (error) { return getDocumentFileStorageMessage(error) }
     }
     if (panel === 'edit-document') { dispatch({ type: 'UPDATE_DOCUMENT', payload: { id: document.id, changes: document } }); showFeedback('Documento atualizado.') }
@@ -78,7 +78,7 @@ function Documents() {
   async function deleteDocument() {
     if (!selected) return
     let physicalDeleteFailed = false
-    try { await deleteDocumentFile(selected.id) } catch { physicalDeleteFailed = true }
+    try { await deleteDocumentFile(selected.id, fileDatabaseName) } catch { physicalDeleteFailed = true }
     dispatch({ type: 'DELETE_DOCUMENT', payload: selected.id })
     setSelectedId(undefined)
     setFileStatus({})
@@ -90,7 +90,7 @@ function Documents() {
     if (!selected) return
     const previewWindow = window.open('', '_blank')
     try {
-      const storedFile = await getDocumentFile(selected.id)
+      const storedFile = await getDocumentFile(selected.id, fileDatabaseName); assertScopeCurrent()
       if (!storedFile) { previewWindow?.close(); setFileStatus({ documentId: selected.id, available: false }); showFeedback('Arquivo não disponível neste dispositivo.'); return }
       setFileStatus({ documentId: selected.id, available: true })
       const extension = storedFile.name.split('.').pop()?.toLowerCase() ?? ''
@@ -107,7 +107,7 @@ function Documents() {
   }
   async function downloadDocument() {
     if (!selected) return
-    try { const storedFile = await getDocumentFile(selected.id); if (!storedFile) { setFileStatus({ documentId: selected.id, available: false }); showFeedback('Arquivo não disponível neste dispositivo.'); return } setFileStatus({ documentId: selected.id, available: true }); downloadStoredFile(storedFile) }
+    try { const storedFile = await getDocumentFile(selected.id, fileDatabaseName); assertScopeCurrent(); if (!storedFile) { setFileStatus({ documentId: selected.id, available: false }); showFeedback('Arquivo não disponível neste dispositivo.'); return } setFileStatus({ documentId: selected.id, available: true }); downloadStoredFile(storedFile) }
     catch { setFileStatus({ documentId: selected.id, available: false }); showFeedback('Não foi possível acessar este arquivo neste dispositivo.') }
   }
   const hasFilters = search || category !== 'all' || type !== 'all' || period !== 'all' || important || linked || folderFilter
@@ -117,7 +117,7 @@ function Documents() {
     {panel === 'create-document' ? <DocumentForm folders={state.documentFolders} chapters={state.chapters} transactions={state.financialTransactions} onCancel={() => setPanel(null)} onSave={saveDocument} /> : null}
     {panel === 'edit-document' && selected ? <DocumentForm key={selected.id} initial={selected} folders={state.documentFolders} chapters={state.chapters} transactions={state.financialTransactions} onCancel={() => setPanel(null)} onSave={saveDocument} /> : null}
     {panel === 'create-folder' ? <FolderForm onCancel={() => setPanel(null)} onSave={folder => { dispatch({ type: 'ADD_DOCUMENT_FOLDER', payload: folder }); setPanel(null); showFeedback('Pasta criada.') }} /> : null}
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[[Files,`${state.documents.length} documentos`],[Folder,`${categoryCount} categorias`],[Files,`${state.documents.filter(document => !!document.chapterId).length} vinculados a capítulos`],[Files,`${state.documents.filter(document => !!document.financialTransactionId).length} vinculados a movimentações`]].map(([Icon,label])=>{const I=Icon as typeof Files;return <Card key={label as string} size="sm" className="shadow-book-xs"><CardContent className="flex min-h-[5rem] items-center justify-center gap-3"><I className="size-5 text-primary" aria-hidden="true"/><p className="text-sm font-medium">{label as string}</p></CardContent></Card>})}</section>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[[Files,`${state.documents.length} documentos`],[Folder,`${categoryCount} categorias`],[Files,`${state.documents.filter(document => !!document.chapterId || state.chapters.some(chapter => Array.isArray(chapter.documentIds) && chapter.documentIds.includes(document.id))).length} vinculados a capítulos`],[Files,`${state.documents.filter(document => !!document.financialTransactionId).length} vinculados a movimentações`]].map(([Icon,label])=>{const I=Icon as typeof Files;return <Card key={label as string} size="sm" className="shadow-book-xs"><CardContent className="flex min-h-[5rem] items-center justify-center gap-3"><I className="size-5 text-primary" aria-hidden="true"/><p className="text-sm font-medium">{label as string}</p></CardContent></Card>})}</section>
     <section><h2 className="font-display text-xl font-semibold">Documentos importantes</h2>{importantDocuments.length ? <div className="mt-4 grid gap-3 lg:grid-cols-3">{importantDocuments.map(document => { const Icon=getDocumentIcon(document.fileType, document.category); return <Card key={document.id} size="sm" className="shadow-book-xs"><CardContent className="flex gap-3"><Icon className="size-5 text-primary" aria-hidden="true"/><div className="min-w-0"><p className="truncate text-sm font-medium">{document.name}</p><p className="mt-1 text-xs text-muted-foreground">{getDocumentCategoryLabel(document.category)} · {formatDocumentDate(document.date)} · {formatBytes(document.sizeInBytes)}</p><Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => { setSelectedId(document.id); setPanel(null) }}>Abrir</Button></div></CardContent></Card> })}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum documento marcado como importante.</p>}</section>
     <section className="flex flex-wrap gap-2">{Object.entries(documentCategoryConfig).map(([id, config]) => { const Icon=config.icon; const count=state.documents.filter(document => normalizeDocumentCategory(document.category) === id).length; return <Button type="button" key={id} variant={category===id?'secondary':'outline'} size="sm" onClick={()=>setCategory(category===id?'all':id)}><Icon aria-hidden="true"/>{config.label} ({count})</Button> })}</section>
     <section className="space-y-4"><div className="flex flex-wrap gap-2"><div className="relative min-w-56 flex-1"><Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true"/><Input className="pl-9" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Buscar documento"/></div><select value={type} onChange={event=>setType(event.target.value)} className="h-8 rounded-lg border bg-card px-3 text-sm"><option value="all">Todos</option>{Object.entries(documentFileTypeConfig).map(([id, config]) => <option key={id} value={id}>{config.label}</option>)}</select><select value={period} onChange={event=>setPeriod(event.target.value)} className="h-8 rounded-lg border bg-card px-3 text-sm"><option value="all">Todos os períodos</option>{periodOptions.map(month => <option key={month} value={month}>{new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(new Date(`${month}-01T12:00:00`))}</option>)}</select><Button type="button" variant={important?'secondary':'outline'} size="sm" aria-pressed={important} onClick={()=>setImportant(!important)}>Importantes</Button><Button type="button" variant={linked?'secondary':'outline'} size="sm" aria-pressed={linked} onClick={()=>setLinked(!linked)}>Com capítulos</Button>{hasFilters?<Button type="button" variant="ghost" size="sm" onClick={clear}>Limpar filtros</Button>:null}</div>

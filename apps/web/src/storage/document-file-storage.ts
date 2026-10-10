@@ -1,6 +1,8 @@
 const DATABASE_NAME = 'siga-files'
-const DATABASE_VERSION = 1
+const DATABASE_VERSION = 2
 const DOCUMENT_STORE = 'documents'
+const CHAPTER_PHOTO_STORE = 'chapter-photos'
+const CHAPTER_PHOTO_CHAPTER_INDEX = 'chapterId'
 
 export interface StoredDocumentFile {
   documentId: string
@@ -35,14 +37,23 @@ function normalizeStorageError(error: unknown) {
   return new DocumentFileStorageError('operation', 'IndexedDB operation failed.', { cause: error })
 }
 
-function openDocumentDatabase(): Promise<IDBDatabase> {
+function openDocumentDatabase(databaseName: string): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') return Promise.reject(new DocumentFileStorageError('unavailable', 'IndexedDB is not available.'))
   return new Promise((resolve, reject) => {
     let settled = false
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION)
+    const request = indexedDB.open(databaseName, DATABASE_VERSION)
     request.onupgradeneeded = () => {
       const database = request.result
       if (!database.objectStoreNames.contains(DOCUMENT_STORE)) database.createObjectStore(DOCUMENT_STORE, { keyPath: 'documentId' })
+      if (!database.objectStoreNames.contains(CHAPTER_PHOTO_STORE)) {
+        const photoStore = database.createObjectStore(CHAPTER_PHOTO_STORE, { keyPath: 'photoId' })
+        photoStore.createIndex(CHAPTER_PHOTO_CHAPTER_INDEX, 'chapterId', { unique: false })
+      } else {
+        const photoStore = request.transaction?.objectStore(CHAPTER_PHOTO_STORE)
+        if (photoStore && !photoStore.indexNames.contains(CHAPTER_PHOTO_CHAPTER_INDEX)) {
+          photoStore.createIndex(CHAPTER_PHOTO_CHAPTER_INDEX, 'chapterId', { unique: false })
+        }
+      }
     }
     request.onsuccess = () => {
       if (settled) {
@@ -66,8 +77,8 @@ function openDocumentDatabase(): Promise<IDBDatabase> {
   })
 }
 
-export async function saveDocumentFile(documentId: string, file: File): Promise<void> {
-  const database = await openDocumentDatabase()
+export async function saveDocumentFile(documentId: string, file: File, databaseName = DATABASE_NAME): Promise<void> {
+  const database = await openDocumentDatabase(databaseName)
   const storedFile: StoredDocumentFile = { documentId, blob: file.slice(0, file.size, file.type), name: file.name, type: file.type, size: file.size, lastModified: file.lastModified }
   return new Promise((resolve, reject) => {
     let settled = false
@@ -95,8 +106,8 @@ export async function saveDocumentFile(documentId: string, file: File): Promise<
   })
 }
 
-export async function getDocumentFile(documentId: string): Promise<StoredDocumentFile | null> {
-  const database = await openDocumentDatabase()
+export async function getDocumentFile(documentId: string, databaseName = DATABASE_NAME): Promise<StoredDocumentFile | null> {
+  const database = await openDocumentDatabase(databaseName)
   return new Promise((resolve, reject) => {
     let result: StoredDocumentFile | null = null
     let settled = false
@@ -125,8 +136,8 @@ export async function getDocumentFile(documentId: string): Promise<StoredDocumen
   })
 }
 
-export async function deleteDocumentFile(documentId: string): Promise<void> {
-  const database = await openDocumentDatabase()
+export async function deleteDocumentFile(documentId: string, databaseName = DATABASE_NAME): Promise<void> {
+  const database = await openDocumentDatabase(databaseName)
   return new Promise((resolve, reject) => {
     let settled = false
     const fail = (error: unknown) => {
@@ -153,8 +164,8 @@ export async function deleteDocumentFile(documentId: string): Promise<void> {
   })
 }
 
-export async function hasDocumentFile(documentId: string): Promise<boolean> {
-  const database = await openDocumentDatabase()
+export async function hasDocumentFile(documentId: string, databaseName = DATABASE_NAME): Promise<boolean> {
+  const database = await openDocumentDatabase(databaseName)
   return new Promise((resolve, reject) => {
     let available = false
     let settled = false
