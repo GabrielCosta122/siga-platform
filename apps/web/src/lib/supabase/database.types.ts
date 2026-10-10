@@ -95,6 +95,38 @@ export type PropertyUpdate = {
   updated_at?: string
 }
 
+export type FinanceSyncRow = { property_id: string; revision: number; updated_at: string }
+export type FinancialLoanRow = {
+  id: string; property_id: string; title: string; institution: string; contract_number: string | null
+  start_date: string | null; first_due_date: string; expected_end_date: string | null
+  original_amount: number | null; financed_amount: number | null; initial_balance: number | null
+  current_balance: number | null; installment_count: number; interest_rate_annual: number | null
+  amortization_system: 'SAC' | 'PRICE' | 'OTHER' | 'UNKNOWN'
+  status: 'active' | 'paid' | 'suspended' | 'cancelled'; notes: string; created_at: string; updated_at: string
+}
+export type LoanInstallmentRow = {
+  id: string; property_id: string; loan_id: string; installment_number: number; due_date: string
+  expected_amount: number | null; expected_principal: number | null; expected_interest: number | null
+  expected_insurance: number | null; expected_fees: number | null; paid_amount: number | null
+  paid_date: string | null; balance_before: number | null; balance_after: number | null
+  status: 'pending' | 'upcoming' | 'paid' | 'overdue' | 'cancelled'
+  financial_transaction_id: string | null; document_ids: string[]; source: 'manual' | 'caixa_import'
+  created_at: string; updated_at: string
+}
+export type FinancialCommitmentRow = {
+  id: string; property_id: string; title: string; amount: number; due_date: string
+  status: 'pending' | 'scheduled' | 'future' | 'paid' | 'cancelled'; category: string
+  chapter_id: string | null; series_id: string | null; installment_number: number | null
+  installment_count: number | null; loan_id: string | null; loan_installment_id: string | null
+  created_at: string; updated_at: string
+}
+export type FinancialTransactionRow = {
+  id: string; property_id: string; title: string; description: string; amount: number; transaction_date: string
+  type: 'expense' | 'income'; status: 'paid' | 'pending' | 'scheduled' | 'cancelled'; category: string
+  chapter_id: string | null; document_ids: string[]; asset_id: string | null; maintenance_id: string | null
+  created_at: string; updated_at: string
+}
+
 export type PropertyMemberRole = 'owner' | 'editor' | 'viewer'
 
 export type PropertyMemberRow = {
@@ -146,6 +178,36 @@ export interface Database {
         Update: PropertyUpdate
         Relationships: []
       }
+      property_finance_sync: {
+        Row: FinanceSyncRow
+        Insert: Partial<FinanceSyncRow> & Pick<FinanceSyncRow, 'property_id'>
+        Update: Partial<FinanceSyncRow>
+        Relationships: []
+      }
+      financial_loans: {
+        Row: FinancialLoanRow
+        Insert: FinancialLoanRow
+        Update: Partial<FinancialLoanRow>
+        Relationships: []
+      }
+      loan_installments: {
+        Row: LoanInstallmentRow
+        Insert: LoanInstallmentRow
+        Update: Partial<LoanInstallmentRow>
+        Relationships: []
+      }
+      financial_commitments: {
+        Row: FinancialCommitmentRow
+        Insert: FinancialCommitmentRow
+        Update: Partial<FinancialCommitmentRow>
+        Relationships: []
+      }
+      financial_transactions: {
+        Row: FinancialTransactionRow
+        Insert: FinancialTransactionRow
+        Update: Partial<FinancialTransactionRow>
+        Relationships: []
+      }
       property_members: {
         Row: PropertyMemberRow
         Insert: PropertyMemberInsert
@@ -165,6 +227,16 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
+      replace_property_financial_snapshot: {
+        Args: {
+          p_property_id: string
+          p_loans: Json
+          p_installments: Json
+          p_commitments: Json
+          p_transactions: Json
+        }
+        Returns: number
+      }
       import_legacy_property: {
         Args: CreatePropertyWithOwnerArgs & { p_import_id: string }
         Returns: PropertyRow

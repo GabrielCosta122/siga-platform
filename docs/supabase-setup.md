@@ -69,3 +69,8 @@ Em `apps/web`, execute `node scripts/test-supabase-foundation.mjs`, `npm run bui
 ## Evolução
 
 A segunda etapa foi implementada: consulte [sessão, imóvel ativo e importação legada](supabase-session-persistence.md). O próximo módulo remoto deve ser migrado em um fluxo vertical, com FK property_id, RLS e testes de isolamento; arquivos só devem ir ao Supabase após políticas de Storage específicas.
+
+
+## Etapa financeira
+
+Após 001, 002 e 003, aplique `supabase/sql/004_financial_sync.sql` uma vez. O checkpoint detalhado e o teste descartável estão em `docs/supabase-financial-sync.md`.

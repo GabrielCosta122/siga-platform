@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Rea
 import type { Property } from '@/domain/types'
 import { useAuth } from '@/auth/useAuth'
 import { updateProperty } from '@/services/supabase/properties.service'
+import { loadFinancialSnapshot, saveFinancialSnapshot } from '@/services/supabase/financial.service'
 import type { UpdatePropertyInput } from '@/lib/supabase/property.mapper'
 import { appReducer } from './app-reducer'
 import { clearAppState, loadAppState, saveAppState } from './persistence'
 import { createInitialAppState } from './initial-data'
 import { AppStoreContext } from './useAppStore'
 import { browserStorage, fileDatabase, loadScopedState, saveScopedState, scopeKey } from './scoped-persistence'
+import { clearFinancePending, financialFingerprint, financialSnapshotFromState, hasFinancePending, isFinancialAction, markFinancePending } from './financial-sync'
 
 export function StateProvider({ children, userId, property, onPropertySaved }: {
   children: ReactNode; userId?: string; property?: Property; onPropertySaved?: (property: Property) => void
@@ -21,6 +23,11 @@ export function StateProvider({ children, userId, property, onPropertySaved }: {
   const [state, reducerDispatch] = useReducer(appReducer, loaded.state)
   const [storageError, setStorageError] = useState(loaded.warning)
   const [writable, setWritable] = useState(loaded.writable)
+  const [financeReady, setFinanceReady] = useState(!userId || !property)
+  const [financeSyncError, setFinanceSyncError] = useState('')
+  const latestState = useRef(state)
+  useEffect(() => { latestState.current = state }, [state])
+  const financeHash = useMemo(() => financialFingerprint(state), [state])
   const alive = useRef(false)
   const revision = auth.getSessionRevision()
   const savingProperty = useRef(false)
@@ -42,8 +49,60 @@ export function StateProvider({ children, userId, property, onPropertySaved }: {
   const dispatch = useCallback((action: Parameters<typeof appReducer>[1]) => {
     assertCurrent()
     if (userId && (action.type === 'UPDATE_PROPERTY' || action.type === 'RESET_STATE')) throw new Error('Use a operação de imóvel autenticada.')
+    if (userId && property && isFinancialAction(action)) markFinancePending(browserStorage(), userId, property.id)
     reducerDispatch(action)
-  }, [assertCurrent, userId])
+  }, [assertCurrent, userId, property])
+  useEffect(() => {
+    if (!userId || !property) return
+    const currentUserId = userId
+    const currentProperty = property
+    let cancelled = false
+    async function initializeFinance() {
+      try {
+        const storage = browserStorage()
+        const remote = await loadFinancialSnapshot(currentProperty.id, currentUserId)
+        assertCurrent()
+        if (cancelled) return
+        if (!remote.initialized || hasFinancePending(storage, currentUserId, currentProperty.id)) {
+          await saveFinancialSnapshot(currentProperty.id, financialSnapshotFromState(latestState.current), currentUserId)
+          assertCurrent()
+          clearFinancePending(storage, currentUserId, currentProperty.id)
+        } else {
+          reducerDispatch({ type: 'REPLACE_FINANCIAL_DATA', payload: {
+            financialLoans: remote.loans, loanInstallments: remote.installments,
+            financialCommitments: remote.commitments, financialTransactions: remote.transactions,
+          } })
+        }
+        if (!cancelled) { setFinanceSyncError(''); setFinanceReady(true) }
+      } catch (cause) {
+        if (!cancelled) {
+          try { markFinancePending(browserStorage(), currentUserId, currentProperty.id) } catch { /* local banner below */ }
+          setFinanceSyncError(cause instanceof Error ? cause.message : 'Não foi possível sincronizar o Financeiro.')
+          setFinanceReady(true)
+        }
+      }
+    }
+    void initializeFinance()
+    return () => { cancelled = true }
+  }, [userId, property, assertCurrent])
+  useEffect(() => {
+    if (!financeReady || !userId || !property) return
+    const currentUserId = userId
+    const currentProperty = property
+    const timeout = globalThis.setTimeout(async () => {
+      try {
+        const storage = browserStorage()
+        if (!hasFinancePending(storage, currentUserId, currentProperty.id)) return
+        await saveFinancialSnapshot(currentProperty.id, financialSnapshotFromState(latestState.current), currentUserId)
+        assertCurrent()
+        clearFinancePending(storage, currentUserId, currentProperty.id)
+        setFinanceSyncError('')
+      } catch (cause) {
+        if (alive.current) setFinanceSyncError(cause instanceof Error ? cause.message : 'Não foi possível sincronizar o Financeiro.')
+      }
+    }, 500)
+    return () => globalThis.clearTimeout(timeout)
+  }, [financeHash, financeReady, userId, property, assertCurrent])
   const saveProperty = useCallback(async (input: UpdatePropertyInput) => {
     assertCurrent()
     if (savingProperty.current) throw new Error('Uma gravação do imóvel já está em andamento.')
@@ -67,6 +126,7 @@ export function StateProvider({ children, userId, property, onPropertySaved }: {
       const storage = browserStorage()
       storage.removeItem(scopeKey(userId, property.id))
       saveScopedState(storage, userId, property.id, empty)
+      markFinancePending(storage, userId, property.id)
     } else if (!clearAppState()) throw new Error('Não foi possível restaurar os dados locais.')
     setWritable(true)
     setStorageError(null)
@@ -76,7 +136,7 @@ export function StateProvider({ children, userId, property, onPropertySaved }: {
     fileDatabaseName: userId && property ? fileDatabase(userId, property.id) : 'siga-files',
   }), [state, dispatch, resetAppData, saveProperty, assertCurrent, userId, property])
   return <AppStoreContext.Provider value={value}>
-    {storageError ? <p role="alert" className="border-b bg-background px-8 py-3 text-sm text-destructive">{storageError}</p> : null}
+    {storageError || financeSyncError ? <p role="alert" className="border-b bg-background px-8 py-3 text-sm text-destructive">{storageError || financeSyncError}</p> : null}
     {children}
   </AppStoreContext.Provider>
 }

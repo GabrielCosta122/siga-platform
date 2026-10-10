@@ -159,6 +159,7 @@ const removeInstallmentsAndFutureCommitments = (
 export function appReducer(state: AppState, action: AppAction): AppState {
   if (action.type === 'HYDRATE_STATE') return action.payload
   if (action.type === 'RESET_STATE') return action.payload ?? createInitialAppState()
+  if (action.type === 'REPLACE_FINANCIAL_DATA') return { ...state, ...action.payload, updatedAt: now() }
   const updatedAt = now()
 
   switch (action.type) {

@@ -4,6 +4,7 @@ import type { AppState } from './app-state'
 export type AppAction =
   | { type: 'HYDRATE_STATE'; payload: AppState }
   | { type: 'RESET_STATE'; payload?: AppState }
+  | { type: 'REPLACE_FINANCIAL_DATA'; payload: Pick<AppState, 'financialTransactions' | 'financialCommitments' | 'financialLoans' | 'loanInstallments'> }
   | { type: 'APPLY_REMOTE_PROPERTY'; payload: Property }
   | { type: 'UPDATE_PROPERTY'; payload: Partial<Property> }
   | { type: 'UPDATE_APP_PREFERENCES'; payload: Partial<AppPreferences> }

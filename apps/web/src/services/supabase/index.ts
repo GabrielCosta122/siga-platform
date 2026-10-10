@@ -1,5 +1,6 @@
 export * from './auth.service'
 export * from './health.service'
+export * from './financial.service'
 export * from './profiles.service'
 export * from './properties.service'
 export * from './service-error'

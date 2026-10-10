@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node scripts/test-supabase-foundation.mjs && node scripts/test-workspace-persistence.mjs && node scripts/test-financing-charges-import.mjs",
+    "test": "node scripts/test-supabase-foundation.mjs && node scripts/test-workspace-persistence.mjs && node scripts/test-financing-charges-import.mjs && node scripts/test-financial-sync.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
